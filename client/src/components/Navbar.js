@@ -1,7 +1,6 @@
 import React from 'react'
 import { Link } from 'react-router-dom'
-import { useAuth ,logout} from '../auth'
-
+import { useAuth , logout} from '../auth'
 
 
 
@@ -9,13 +8,16 @@ const LoggedInLinks = () => {
     return (
         <>
             <li className="nav-item">
-                <Link className="nav-link active" to="/">Home</Link>
+                <Link className="nav-link active" to="/">首页</Link>
             </li>
             <li className="nav-item">
-                <Link className="nav-link  active" to="/create_recipe">Create Recipes</Link>
+                <Link className="nav-link active" to="/create_recipe">创建食谱</Link>
             </li>
             <li className="nav-item">
-                <a className="nav-link active" href="#" onClick={()=>{logout()}}>Log Out</a>
+                <Link className="nav-link active" to="/favorites">我的收藏</Link>
+            </li>
+            <li className="nav-item">
+                <a className="nav-link active" href="#" onClick={()=>{logout()}}>退出登录</a>
             </li>
         </>
     )
@@ -26,13 +28,13 @@ const LoggedOutLinks = () => {
     return (
         <>
             <li className="nav-item">
-                <Link className="nav-link active" to="/">Home</Link>
+                <Link className="nav-link active" to="/">首页</Link>
             </li>
             <li className="nav-item">
-                <Link className="nav-link active" to="/signup">Sign Up</Link>
+                <Link className="nav-link active" to="/signup">注册</Link>
             </li>
             <li className="nav-item">
-                <Link className="nav-link active" to="/login" >Login</Link>
+                <Link className="nav-link active" to="/login" >登录</Link>
             </li>
 
         </>
@@ -46,7 +48,7 @@ const NavBar = () => {
     return (
         <nav className="navbar navbar-expand-lg navbar-dark bg-dark">
             <div className="container-fluid">
-                <Link className="navbar-brand" to="/">Recipes</Link>
+                <Link className="navbar-brand" to="/">食谱分享</Link>
                 <button className="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
                     <span className="navbar-toggler-icon"></span>
                 </button>

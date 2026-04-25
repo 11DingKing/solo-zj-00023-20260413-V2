@@ -1,9 +1,9 @@
 import React, { useEffect, useState, useRef, useCallback } from "react";
 import { Link } from "react-router-dom";
 import { useAuth } from "../auth";
-import Recipe from "./Recipe";
-import { Modal, Form, Button, Pagination, Card } from "react-bootstrap";
+import { Modal, Form, Button, Pagination } from "react-bootstrap";
 import { useForm } from "react-hook-form";
+import RecipeCard from "./RecipeCard";
 
 const useDebounce = (value, delay) => {
   const [debouncedValue, setDebouncedValue] = useState(value);
@@ -34,6 +34,9 @@ const LoggedinHome = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(0);
   const [totalItems, setTotalItems] = useState(0);
+  const [loading, setLoading] = useState(false);
+  const [sortBy, setSortBy] = useState("created_at");
+  const [editingRecipe, setEditingRecipe] = useState(null);
   const debouncedSearch = useDebounce(searchTerm, 400);
 
   const {
@@ -43,11 +46,13 @@ const LoggedinHome = () => {
     setValue,
     formState: { errors },
   } = useForm();
-  const [recipeId, setRecipeId] = useState(0);
 
-  const fetchRecipes = useCallback((page, search) => {
+  const fetchRecipes = useCallback((page, search, sort) => {
+    setLoading(true);
     const params = new URLSearchParams();
     params.append("page", page);
+    params.append("per_page", 8);
+    params.append("sort_by", sort);
     if (search) {
       params.append("search", search);
     }
@@ -75,45 +80,40 @@ const LoggedinHome = () => {
       .catch((err) => {
         console.log(err);
         setRecipes([]);
+      })
+      .finally(() => {
+        setLoading(false);
       });
   }, []);
 
   useEffect(() => {
     setCurrentPage(1);
-    fetchRecipes(1, debouncedSearch);
-  }, [debouncedSearch, fetchRecipes]);
+    fetchRecipes(1, debouncedSearch, sortBy);
+  }, [debouncedSearch, sortBy, fetchRecipes]);
 
   useEffect(() => {
     if (currentPage > 1) {
-      fetchRecipes(currentPage, debouncedSearch);
+      fetchRecipes(currentPage, debouncedSearch, sortBy);
     }
-  }, [currentPage, debouncedSearch, fetchRecipes]);
-
-  const getAllRecipes = () => {
-    fetchRecipes(currentPage, debouncedSearch);
-  };
+  }, [currentPage, debouncedSearch, sortBy, fetchRecipes]);
 
   const closeModal = () => {
     setShow(false);
+    setEditingRecipe(null);
+    reset();
   };
 
-  const showModal = (id) => {
+  const showEditModal = (recipe) => {
+    setEditingRecipe(recipe);
     setShow(true);
-    setRecipeId(id);
-    if (Array.isArray(recipes)) {
-      recipes.forEach((recipe) => {
-        if (recipe.id == id) {
-          setValue("title", recipe.title);
-          setValue("description", recipe.description);
-        }
-      });
-    }
+    setValue("title", recipe.title);
+    setValue("description", recipe.description);
   };
 
-  let token = localStorage.getItem("REACT_TOKEN_AUTH_KEY");
+  const token = localStorage.getItem("REACT_TOKEN_AUTH_KEY");
 
   const updateRecipe = (data) => {
-    console.log(data);
+    if (!editingRecipe) return;
 
     const requestOptions = {
       method: "PUT",
@@ -121,22 +121,25 @@ const LoggedinHome = () => {
         "content-type": "application/json",
         Authorization: `Bearer ${JSON.parse(token)}`,
       },
-      body: JSON.stringify(data),
+      body: JSON.stringify({
+        title: data.title,
+        description: data.description,
+        ingredients: editingRecipe.ingredients || [],
+        steps: editingRecipe.steps || [],
+      }),
     };
 
-    fetch(`/recipe/recipe/${recipeId}`, requestOptions)
+    fetch(`/recipe/recipe/${editingRecipe.id}`, requestOptions)
       .then((res) => res.json())
       .then((data) => {
-        console.log(data);
-
-        const reload = window.location.reload();
-        reload();
+        closeModal();
+        fetchRecipes(currentPage, debouncedSearch, sortBy);
       })
       .catch((err) => console.log(err));
   };
 
   const deleteRecipe = (id) => {
-    console.log(id);
+    if (!window.confirm("确定要删除这个食谱吗？")) return;
 
     const requestOptions = {
       method: "DELETE",
@@ -149,8 +152,7 @@ const LoggedinHome = () => {
     fetch(`/recipe/recipe/${id}`, requestOptions)
       .then((res) => res.json())
       .then((data) => {
-        console.log(data);
-        getAllRecipes();
+        fetchRecipes(currentPage, debouncedSearch, sortBy);
       })
       .catch((err) => console.log(err));
   };
@@ -192,98 +194,107 @@ const LoggedinHome = () => {
     );
   };
 
-  const renderEmptyState = () => {
-    if (recipes.length === 0 && totalItems === 0) {
-      return (
-        <Card className="recipe">
-          <Card.Body>
-            <Card.Title className="text-center text-muted">
-              没有找到相关食谱
-            </Card.Title>
-          </Card.Body>
-        </Card>
-      );
-    }
-    return null;
-  };
-
-  const recipeList = Array.isArray(recipes) ? recipes : [];
-
   return (
-    <div className="recipes container">
+    <div className="container">
       <Modal show={show} size="lg" onHide={closeModal}>
         <Modal.Header closeButton>
-          <Modal.Title>Update Recipe</Modal.Title>
+          <Modal.Title>编辑食谱</Modal.Title>
         </Modal.Header>
         <Modal.Body>
           <form>
             <Form.Group>
-              <Form.Label>Title</Form.Label>
+              <Form.Label>标题</Form.Label>
               <Form.Control
                 type="text"
-                {...register("title", { required: true, maxLength: 25 })}
+                {...register("title", { required: true, maxLength: 100 })}
               />
             </Form.Group>
             {errors.title && (
               <p style={{ color: "red" }}>
-                <small>Title is required</small>
+                <small>标题是必填项</small>
               </p>
             )}
-            {errors.title?.type === "maxLength" && (
-              <p style={{ color: "red" }}>
-                <small>Title should be less than 25 characters</small>
-              </p>
-            )}
-            <Form.Group>
-              <Form.Label>Description</Form.Label>
+            <Form.Group className="mt-3">
+              <Form.Label>描述</Form.Label>
               <Form.Control
                 as="textarea"
                 rows={5}
-                {...register("description", { required: true, maxLength: 255 })}
+                {...register("description", { required: true })}
               />
             </Form.Group>
             {errors.description && (
               <p style={{ color: "red" }}>
-                <small>Description is required</small>
+                <small>描述是必填项</small>
               </p>
             )}
-            {errors.description?.type === "maxLength" && (
-              <p style={{ color: "red" }}>
-                <small>Description should be less than 255 characters</small>
-              </p>
-            )}
-            <br></br>
+            <p className="text-muted small mt-2">
+              提示：食材和步骤需要在创建食谱时设置。
+            </p>
+            <br />
             <Form.Group>
               <Button variant="primary" onClick={handleSubmit(updateRecipe)}>
-                Save
+                保存
               </Button>
             </Form.Group>
           </form>
         </Modal.Body>
       </Modal>
-      <h1>List of Recipes</h1>
-      <Form.Group className="mb-4 search-container">
-        <Form.Control
-          type="text"
-          placeholder="搜索食谱标题或描述..."
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-        />
-      </Form.Group>
-      {renderEmptyState()}
-      {recipeList.map((recipe, index) => (
-        <Recipe
-          recipe={recipe}
-          key={index}
-          onClick={() => {
-            showModal(recipe.id);
-          }}
-          onDelete={() => {
-            deleteRecipe(recipe.id);
-          }}
-        />
-      ))}
-      {renderPagination()}
+
+      <h1 className="mb-4">食谱列表</h1>
+
+      <div className="d-flex flex-wrap gap-3 mb-4">
+        <Form.Group className="search-container mb-0">
+          <Form.Control
+            type="text"
+            placeholder="搜索食谱标题或描述..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+          />
+        </Form.Group>
+
+        <div className="sort-container mb-0">
+          <span className="sort-label">排序:</span>
+          <select
+            className="sort-select"
+            value={sortBy}
+            onChange={(e) => setSortBy(e.target.value)}
+          >
+            <option value="created_at">按创建时间</option>
+            <option value="rating">按评分</option>
+          </select>
+        </div>
+      </div>
+
+      {loading ? (
+        <div className="loading-container">
+          <div className="spinner"></div>
+        </div>
+      ) : recipes.length === 0 ? (
+        <div className="empty-state">
+          <div className="empty-state-icon">🍳</div>
+          <h2 className="empty-state-title">暂无食谱</h2>
+          <p className="empty-state-text">
+            {searchTerm ? "没有找到匹配的食谱，请尝试其他关键词。" : "还没有任何食谱，快来创建第一个吧！"}
+          </p>
+          <Link to="/create_recipe" className="btn btn-primary mt-3">
+            创建食谱
+          </Link>
+        </div>
+      ) : (
+        <>
+          <div className="recipes-grid">
+            {recipes.map((recipe) => (
+              <RecipeCard
+                key={recipe.id}
+                recipe={recipe}
+                onUpdate={showEditModal}
+                onDelete={deleteRecipe}
+              />
+            ))}
+          </div>
+          {renderPagination()}
+        </>
+      )}
     </div>
   );
 };
@@ -294,11 +305,16 @@ const LoggedOutHome = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(0);
   const [totalItems, setTotalItems] = useState(0);
+  const [loading, setLoading] = useState(false);
+  const [sortBy, setSortBy] = useState("created_at");
   const debouncedSearch = useDebounce(searchTerm, 400);
 
-  const fetchRecipes = useCallback((page, search) => {
+  const fetchRecipes = useCallback((page, search, sort) => {
+    setLoading(true);
     const params = new URLSearchParams();
     params.append("page", page);
+    params.append("per_page", 8);
+    params.append("sort_by", sort);
     if (search) {
       params.append("search", search);
     }
@@ -326,19 +342,22 @@ const LoggedOutHome = () => {
       .catch((err) => {
         console.log(err);
         setRecipes([]);
+      })
+      .finally(() => {
+        setLoading(false);
       });
   }, []);
 
   useEffect(() => {
     setCurrentPage(1);
-    fetchRecipes(1, debouncedSearch);
-  }, [debouncedSearch, fetchRecipes]);
+    fetchRecipes(1, debouncedSearch, sortBy);
+  }, [debouncedSearch, sortBy, fetchRecipes]);
 
   useEffect(() => {
     if (currentPage > 1) {
-      fetchRecipes(currentPage, debouncedSearch);
+      fetchRecipes(currentPage, debouncedSearch, sortBy);
     }
-  }, [currentPage, debouncedSearch, fetchRecipes]);
+  }, [currentPage, debouncedSearch, sortBy, fetchRecipes]);
 
   const handlePageChange = (page) => {
     setCurrentPage(page);
@@ -377,45 +396,70 @@ const LoggedOutHome = () => {
     );
   };
 
-  const renderEmptyState = () => {
-    if (recipes.length === 0 && totalItems === 0) {
-      return (
-        <Card className="recipe">
-          <Card.Body>
-            <Card.Title className="text-center text-muted">
-              没有找到相关食谱
-            </Card.Title>
-          </Card.Body>
-        </Card>
-      );
-    }
-    return null;
-  };
-
-  const recipeList = Array.isArray(recipes) ? recipes : [];
-
   return (
-    <div className="recipes container">
-      <h1 className="heading">Welcome to the Recipes</h1>
-      <Link to="/signup" className="btn btn-primary btn-lg">
-        Get Started
-      </Link>
-      <br />
-      <br />
-      <h2>Browse Recipes</h2>
-      <Form.Group className="mb-4 search-container">
-        <Form.Control
-          type="text"
-          placeholder="搜索食谱标题或描述..."
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-        />
-      </Form.Group>
-      {renderEmptyState()}
-      {recipeList.map((recipe, index) => (
-        <Recipe recipe={recipe} key={index} />
-      ))}
-      {renderPagination()}
+    <div className="container">
+      <div className="text-center py-5 mb-4">
+        <h1 className="heading mb-4">欢迎来到食谱分享平台</h1>
+        <p className="lead text-muted mb-4">
+          发现美食，分享厨艺，记录每一道美味
+        </p>
+        <div className="d-flex justify-content-center gap-3">
+          <Link to="/signup" className="btn btn-primary btn-lg">
+            立即注册
+          </Link>
+          <Link to="/login" className="btn btn-outline-primary btn-lg">
+            登录账户
+          </Link>
+        </div>
+      </div>
+
+      <h2 className="mb-4">浏览食谱</h2>
+
+      <div className="d-flex flex-wrap gap-3 mb-4">
+        <Form.Group className="search-container mb-0">
+          <Form.Control
+            type="text"
+            placeholder="搜索食谱标题或描述..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+          />
+        </Form.Group>
+
+        <div className="sort-container mb-0">
+          <span className="sort-label">排序:</span>
+          <select
+            className="sort-select"
+            value={sortBy}
+            onChange={(e) => setSortBy(e.target.value)}
+          >
+            <option value="created_at">按创建时间</option>
+            <option value="rating">按评分</option>
+          </select>
+        </div>
+      </div>
+
+      {loading ? (
+        <div className="loading-container">
+          <div className="spinner"></div>
+        </div>
+      ) : recipes.length === 0 ? (
+        <div className="empty-state">
+          <div className="empty-state-icon">🍳</div>
+          <h2 className="empty-state-title">暂无食谱</h2>
+          <p className="empty-state-text">
+            {searchTerm ? "没有找到匹配的食谱，请尝试其他关键词。" : "还没有任何食谱。"}
+          </p>
+        </div>
+      ) : (
+        <>
+          <div className="recipes-grid">
+            {recipes.map((recipe) => (
+              <RecipeCard key={recipe.id} recipe={recipe} />
+            ))}
+          </div>
+          {renderPagination()}
+        </>
+      )}
     </div>
   );
 };

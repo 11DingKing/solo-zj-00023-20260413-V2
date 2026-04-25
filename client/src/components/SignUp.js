@@ -1,132 +1,168 @@
 import React, { useState } from 'react'
 import { Form, Button, Alert } from 'react-bootstrap'
-import { Link } from 'react-router-dom'
+import { Link, useHistory } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 
 
 const SignUpPage = () => {
+    const history = useHistory()
 
+    const { register, handleSubmit, reset, formState: { errors }, watch } = useForm();
+    const [showSuccess, setShowSuccess] = useState(false)
+    const [showError, setShowError] = useState(false)
+    const [serverResponse, setServerResponse] = useState('')
+    const password = watch('password', '')
 
-    const { register, handleSubmit, reset, formState: { errors } } = useForm();
-    const [show,setShow]=useState(false)
-    const [serverResponse,setServerResponse]=useState('')
+    const submitForm = async (data) => {
+        setShowError(false)
+        setShowSuccess(false)
 
-    const submitForm = (data) => {
-
-
-        if (data.password === data.confirmPassword) {
-
-
-            const body = {
-                username: data.username,
-                email: data.email,
-                password: data.password
-            }
-
-            const requestOptions = {
-                method: "POST",
-                headers: {
-                    'content-type': 'application/json'
-                },
-                body: JSON.stringify(body)
-            }
-
-
-            fetch('/auth/signup', requestOptions)
-                .then(res => res.json())
-                .then(data =>{
-                    console.log(data)
-                    setServerResponse(data.message)
-                    setShow(true)
-                })
-                .catch(err => console.log(err))
-
-            reset()
+        if (data.password !== data.confirmPassword) {
+            setServerResponse("两次输入的密码不一致")
+            setShowError(true)
+            return
         }
 
-        else {
-            alert("Passwords do not match")
+        const body = {
+            username: data.username,
+            email: data.email,
+            password: data.password
         }
 
+        const requestOptions = {
+            method: "POST",
+            headers: {
+                'content-type': 'application/json'
+            },
+            body: JSON.stringify(body)
+        }
 
+        try {
+            const res = await fetch('/auth/signup', requestOptions)
+            const result = await res.json()
+            
+            if (res.ok) {
+                setServerResponse(result.message || "注册成功！")
+                setShowSuccess(true)
+                reset()
+                setTimeout(() => {
+                    history.push('/login')
+                }, 2000)
+            } else {
+                setServerResponse(result.message || "注册失败，请重试")
+                setShowError(true)
+            }
+        } catch (err) {
+            console.log(err)
+            setServerResponse("网络错误，请稍后重试")
+            setShowError(true)
+        }
     }
 
+    const getPasswordStrength = () => {
+        if (password.length < 8) {
+            return { level: 0, text: "密码长度不足", class: "text-danger" }
+        }
+        const hasLetter = /[A-Za-z]/.test(password)
+        const hasNumber = /[0-9]/.test(password)
+        
+        if (hasLetter && hasNumber && password.length >= 12) {
+            return { level: 3, text: "强", class: "text-success" }
+        } else if (hasLetter && hasNumber) {
+            return { level: 2, text: "中等", class: "text-warning" }
+        } else {
+            return { level: 1, text: "弱", class: "text-danger" }
+        }
+    }
+
+    const passwordStrength = getPasswordStrength()
 
     return (
         <div className="container">
             <div className="form">
+                <h1 className="mb-4">注册账户</h1>
 
-                
-               {show?
-               <>
-                <Alert variant="success" onClose={() => {setShow(false)
-                }} dismissible>
-                <p>
-                   {serverResponse}
-                </p>
-                </Alert>
+                {showSuccess && (
+                    <Alert variant="success" onClose={() => setShowSuccess(false)} dismissible>
+                        <p>{serverResponse}</p>
+                        <p className="mb-0">正在跳转到登录页面...</p>
+                    </Alert>
+                )}
 
-                <h1>Sign Up Page</h1>
-                
-                </>
-                :
-                <h1>Sign Up Page</h1>
-               
-               }
-                <form>
-                    <Form.Group>
-                        <Form.Label>Username</Form.Label>
+                {showError && (
+                    <Alert variant="danger" onClose={() => setShowError(false)} dismissible>
+                        {serverResponse}
+                    </Alert>
+                )}
+
+                <Form>
+                    <Form.Group className="mb-3">
+                        <Form.Label>用户名</Form.Label>
                         <Form.Control type="text"
-                            placeholder="Your username"
+                            placeholder="请输入用户名"
                             {...register("username", { required: true, maxLength: 25 })}
                         />
-
-                        {errors.username && <small style={{ color: "red" }}>Username is required</small>}
-                        {errors.username?.type === "maxLength" && <p style={{ color: "red" }}><small>Max characters should be 25 </small></p>}
+                        {errors.username && <p className="text-danger small mt-1 mb-0"><small>用户名是必填项（最多25个字符）</small></p>}
                     </Form.Group>
-                    <br></br>
-                    <Form.Group>
-                        <Form.Label>Email</Form.Label>
+
+                    <Form.Group className="mb-3">
+                        <Form.Label>邮箱</Form.Label>
                         <Form.Control type="email"
-                            placeholder="Your email"
+                            placeholder="请输入邮箱地址"
                             {...register("email", { required: true, maxLength: 80 })}
                         />
-
-                        {errors.email && <p style={{ color: "red" }}><small>Email is required</small></p>}
-
-                        {errors.email?.type === "maxLength" && <p style={{ color: "red" }}><small>Max characters should be 80</small></p>}
+                        {errors.email && <p className="text-danger small mt-1 mb-0"><small>邮箱是必填项</small></p>}
                     </Form.Group>
-                    <br></br>
-                    <Form.Group>
-                        <Form.Label>Password</Form.Label>
+
+                    <Form.Group className="mb-3">
+                        <Form.Label>密码</Form.Label>
                         <Form.Control type="password"
-                            placeholder="Your password"
+                            placeholder="请输入密码"
                             {...register("password", { required: true, minLength: 8 })}
-
                         />
-
-                        {errors.password && <p style={{ color: "red" }}><small>Password is required</small></p>}
-                        {errors.password?.type === "minLength" && <p style={{ color: "red" }}><small>Min characters should be 8</small></p>}
+                        {errors.password && <p className="text-danger small mt-1 mb-0"><small>密码是必填项</small></p>}
+                        {errors.password?.type === "minLength" && <p className="text-danger small mt-1 mb-0"><small>密码至少需要8个字符</small></p>}
+                        
+                        <div className="password-requirements">
+                            <p className="mb-1"><strong>密码要求：</strong></p>
+                            <ul className="mb-0">
+                                <li className={password.length >= 8 ? "text-success" : "text-muted"}>
+                                    {password.length >= 8 ? "✓" : "○"} 至少8个字符
+                                </li>
+                                <li className={/[A-Za-z]/.test(password) ? "text-success" : "text-muted"}>
+                                    {/[A-Za-z]/.test(password) ? "✓" : "○"} 包含字母
+                                </li>
+                                <li className={/[0-9]/.test(password) ? "text-success" : "text-muted"}>
+                                    {/[0-9]/.test(password) ? "✓" : "○"} 包含数字
+                                </li>
+                            </ul>
+                        </div>
+                        
+                        {password.length > 0 && (
+                            <div className={`mt-2 small ${passwordStrength.class}`}>
+                                密码强度: {passwordStrength.text}
+                            </div>
+                        )}
                     </Form.Group>
-                    <br></br>
-                    <Form.Group>
-                        <Form.Label>Confirm Password</Form.Label>
-                        <Form.Control type="password" placeholder="Your password"
+
+                    <Form.Group className="mb-3">
+                        <Form.Label>确认密码</Form.Label>
+                        <Form.Control type="password" placeholder="请再次输入密码"
                             {...register("confirmPassword", { required: true, minLength: 8 })}
                         />
-                        {errors.confirmPassword && <p style={{ color: "red" }}><small>Confirm Password is required</small></p>}
-                        {errors.confirmPassword?.type === "minLength" && <p style={{ color: "red" }}><small>Min characters should be 8</small></p>}
+                        {errors.confirmPassword && <p className="text-danger small mt-1 mb-0"><small>请确认密码</small></p>}
                     </Form.Group>
-                    <br></br>
+
+                    <Form.Group className="mb-3">
+                        <Button variant="primary" onClick={handleSubmit(submitForm)}>
+                            注册
+                        </Button>
+                    </Form.Group>
+
                     <Form.Group>
-                        <Button as="sub" variant="primary" onClick={handleSubmit(submitForm)}>SignUp</Button>
+                        <small>已有账户？<Link to='/login'>立即登录</Link></small>
                     </Form.Group>
-                    <br></br>
-                    <Form.Group>
-                        <small>Already have an account, <Link to='/login'>Log In</Link></small>
-                    </Form.Group>
-                    <br></br>
-                </form>
+                </Form>
             </div>
         </div>
     )

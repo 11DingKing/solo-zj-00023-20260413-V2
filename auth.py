@@ -1,3 +1,4 @@
+import re
 from flask_restx import Resource, Namespace, fields
 from models import User
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -29,6 +30,16 @@ login_model = auth_ns.model(
 )
 
 
+def is_strong_password(password):
+    if len(password) < 8:
+        return False
+    if not re.search(r'[A-Za-z]', password):
+        return False
+    if not re.search(r'[0-9]', password):
+        return False
+    return True
+
+
 @auth_ns.route("/signup")
 class SignUp(Resource):
     @auth_ns.expect(signup_model)
@@ -36,21 +47,28 @@ class SignUp(Resource):
         data = request.get_json()
 
         username = data.get("username")
+        password = data.get("password")
 
         db_user = User.query.filter_by(username=username).first()
 
         if db_user is not None:
             return jsonify({"message": f"User with username {username} already exists"})
+        
+        if not is_strong_password(password):
+            return make_response(
+                jsonify({"message": "Password must be at least 8 characters long and contain both letters and numbers"}),
+                400
+            )
 
         new_user = User(
             username=data.get("username"),
             email=data.get("email"),
-            password=generate_password_hash(data.get("password")),
+            password=generate_password_hash(password),
         )
 
         new_user.save()
 
-        return make_response(jsonify({"message": "User created successfuly"}), 201)
+        return make_response(jsonify({"message": "User created successfully"}), 201)
 
 
 @auth_ns.route("/login")

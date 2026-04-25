@@ -13,7 +13,8 @@ import HomePage from './components/Home';
 import SignUpPage from './components/SignUp';
 import LoginPage from './components/Login';
 import CreateRecipePage from './components/CreateRecipe';
-
+import RecipeDetail from './components/RecipeDetail';
+import Favorites from './components/Favorites';
 
 
 
@@ -25,6 +26,12 @@ const App=()=>{
         <div className="">
             <NavBar/>
             <Switch>
+                <Route path="/favorites">
+                    <Favorites/>
+                </Route>
+                <Route path="/recipe/:id">
+                    <RecipeDetail/>
+                </Route>
                 <Route path="/create_recipe">
                     <CreateRecipePage/>
                 </Route>
