@@ -17,20 +17,13 @@ depends_on = None
 
 
 def upgrade():
-    # Add new columns to recipe table
-    op.add_column('recipe', sa.Column('ingredients', sa.JSON(), nullable=True, server_default='[]'))
-    op.add_column('recipe', sa.Column('steps', sa.JSON(), nullable=True, server_default='[]'))
-    op.add_column('recipe', sa.Column('user_id', sa.Integer(), nullable=True))
-    op.add_column('recipe', sa.Column('created_at', sa.DateTime(), nullable=True))
-    
-    # Create foreign key constraint for user_id
-    op.create_foreign_key(
-        'fk_recipe_user',
-        'recipe',
-        'user',
-        ['user_id'],
-        ['id']
-    )
+    # Add new columns to recipe table with batch mode for SQLite compatibility
+    with op.batch_alter_table('recipe', schema=None) as batch_op:
+        batch_op.add_column(sa.Column('ingredients', sa.JSON(), nullable=True, server_default='[]'))
+        batch_op.add_column(sa.Column('steps', sa.JSON(), nullable=True, server_default='[]'))
+        batch_op.add_column(sa.Column('user_id', sa.Integer(), nullable=True))
+        batch_op.add_column(sa.Column('created_at', sa.DateTime(), nullable=True))
+        batch_op.create_foreign_key('fk_recipe_user', 'user', ['user_id'], ['id'])
     
     # Create favorite table
     op.create_table('favorite',
@@ -49,11 +42,10 @@ def downgrade():
     # Drop favorite table
     op.drop_table('favorite')
     
-    # Drop foreign key constraint
-    op.drop_constraint('fk_recipe_user', 'recipe', type_='foreignkey')
-    
-    # Drop columns from recipe table
-    op.drop_column('recipe', 'created_at')
-    op.drop_column('recipe', 'user_id')
-    op.drop_column('recipe', 'steps')
-    op.drop_column('recipe', 'ingredients')
+    # Drop foreign key and columns from recipe table with batch mode for SQLite compatibility
+    with op.batch_alter_table('recipe', schema=None) as batch_op:
+        batch_op.drop_constraint('fk_recipe_user', type_='foreignkey')
+        batch_op.drop_column('created_at')
+        batch_op.drop_column('user_id')
+        batch_op.drop_column('steps')
+        batch_op.drop_column('ingredients')
