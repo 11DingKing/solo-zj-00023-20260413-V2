@@ -31,6 +31,8 @@ login_model = auth_ns.model(
 
 
 def is_strong_password(password):
+    if not password or not isinstance(password, str):
+        return False
     if len(password) < 8:
         return False
     if not re.search(r'[A-Za-z]', password):

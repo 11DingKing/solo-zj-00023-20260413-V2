@@ -11,13 +11,18 @@ const SignUpPage = () => {
     const [showSuccess, setShowSuccess] = useState(false)
     const [showError, setShowError] = useState(false)
     const [serverResponse, setServerResponse] = useState('')
-    const password = watch('password', '')
+    
+    const passwordValue = watch('password')
+    const password = typeof passwordValue === 'string' ? passwordValue : ''
 
     const submitForm = async (data) => {
         setShowError(false)
         setShowSuccess(false)
 
-        if (data.password !== data.confirmPassword) {
+        const passwordData = data.password || ''
+        const confirmPasswordData = data.confirmPassword || ''
+
+        if (passwordData !== confirmPasswordData) {
             setServerResponse("两次输入的密码不一致")
             setShowError(true)
             return
@@ -26,7 +31,7 @@ const SignUpPage = () => {
         const body = {
             username: data.username,
             email: data.email,
-            password: data.password
+            password: passwordData
         }
 
         const requestOptions = {
@@ -60,13 +65,16 @@ const SignUpPage = () => {
     }
 
     const getPasswordStrength = () => {
-        if (password.length < 8) {
+        const pwd = password || ''
+        
+        if (!pwd || pwd.length < 8) {
             return { level: 0, text: "密码长度不足", class: "text-danger" }
         }
-        const hasLetter = /[A-Za-z]/.test(password)
-        const hasNumber = /[0-9]/.test(password)
         
-        if (hasLetter && hasNumber && password.length >= 12) {
+        const hasLetter = /[A-Za-z]/.test(pwd)
+        const hasNumber = /[0-9]/.test(pwd)
+        
+        if (hasLetter && hasNumber && pwd.length >= 12) {
             return { level: 3, text: "强", class: "text-success" }
         } else if (hasLetter && hasNumber) {
             return { level: 2, text: "中等", class: "text-warning" }
@@ -76,6 +84,9 @@ const SignUpPage = () => {
     }
 
     const passwordStrength = getPasswordStrength()
+    const passwordLength = password ? password.length : 0
+    const hasLetter = password ? /[A-Za-z]/.test(password) : false
+    const hasNumber = password ? /[0-9]/.test(password) : false
 
     return (
         <div className="container">
@@ -126,19 +137,19 @@ const SignUpPage = () => {
                         <div className="password-requirements">
                             <p className="mb-1"><strong>密码要求：</strong></p>
                             <ul className="mb-0">
-                                <li className={password.length >= 8 ? "text-success" : "text-muted"}>
-                                    {password.length >= 8 ? "✓" : "○"} 至少8个字符
+                                <li className={passwordLength >= 8 ? "text-success" : "text-muted"}>
+                                    {passwordLength >= 8 ? "✓" : "○"} 至少8个字符
                                 </li>
-                                <li className={/[A-Za-z]/.test(password) ? "text-success" : "text-muted"}>
-                                    {/[A-Za-z]/.test(password) ? "✓" : "○"} 包含字母
+                                <li className={hasLetter ? "text-success" : "text-muted"}>
+                                    {hasLetter ? "✓" : "○"} 包含字母
                                 </li>
-                                <li className={/[0-9]/.test(password) ? "text-success" : "text-muted"}>
-                                    {/[0-9]/.test(password) ? "✓" : "○"} 包含数字
+                                <li className={hasNumber ? "text-success" : "text-muted"}>
+                                    {hasNumber ? "✓" : "○"} 包含数字
                                 </li>
                             </ul>
                         </div>
                         
-                        {password.length > 0 && (
+                        {passwordLength > 0 && (
                             <div className={`mt-2 small ${passwordStrength.class}`}>
                                 密码强度: {passwordStrength.text}
                             </div>
