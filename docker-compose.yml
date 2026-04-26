@@ -2,7 +2,8 @@ services:
   web:
     build: .
     ports:
-      - "5001:5000"
+      - "5000:5000"
     environment:
       - SECRET_KEY=dev-secret-key
       - DATABASE_URI=sqlite:///prod.db
+    restart: unless-stopped
