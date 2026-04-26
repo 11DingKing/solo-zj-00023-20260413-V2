@@ -5,7 +5,7 @@ WORKDIR /app
 
 # 复制 package.json 并安装依赖
 COPY client/package.json client/package-lock.json ./
-RUN npm install
+RUN npm config set registry https://registry.npmmirror.com && npm install
 
 # 复制前端源代码并构建
 COPY client/ ./
